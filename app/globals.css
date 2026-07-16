@@ -212,13 +212,15 @@ body {
    420px is the ceiling. The height budget is what usually wins: a 9:16 card
    420 wide is 747 tall and will not share a laptop screen with the banner and
    footer, and the row exists precisely so the whole campaign fits unscrolled.
-   336px is the measured chrome above and below the card (padding, banner,
-   headline row, footer) — measured, not guessed. dvh, not vh, so browser
-   chrome cannot cause a scrollbar. Above roughly 1200px tall the 420px cap
-   takes over and the layout stops growing. */
+   364px is the measured chrome above and below the card: padding, banner,
+   the headline row and the footer. Measured, not guessed — and it tracks the
+   headline, which wraps to three lines at the clamp's 2.25rem desktop size.
+   Re-measure this if the headline size ever changes. dvh, not vh, so browser
+   chrome cannot cause a scrollbar. Past ~1300px tall the 420px cap takes over
+   and the layout stops growing. */
 @media (min-width: 64rem) {
   .epa-pair {
-    --epa-card-w: min(420px, calc((100dvh - 336px) * 0.5625));
+    --epa-card-w: min(420px, calc((100dvh - 364px) * 0.5625));
   }
 }
 
