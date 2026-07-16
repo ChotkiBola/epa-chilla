@@ -1,0 +1,15 @@
+# HLS segments are MPEG-TS, not TypeScript. Without this Git tries to diff
+# them as text and GitHub's language stats think the repo is TypeScript-heavy.
+public/videos/**/*.ts binary
+public/videos/**/*.ts linguist-generated=true
+
+# Playlists are text, but must keep LF or some players choke.
+public/videos/**/*.m3u8 text eol=lf
+
+*.mp4 binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.woff binary
+*.woff2 binary

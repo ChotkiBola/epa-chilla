@@ -1,0 +1,28 @@
+{
+  "name": "epa-chilla",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "videos": "node scripts/generate-videos.mjs",
+    "predev": "npm run videos",
+    "dev": "next dev",
+    "prebuild": "npm run videos",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

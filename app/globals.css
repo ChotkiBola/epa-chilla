@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------
+   Brand font. Files are NOT in the repo — see public/fonts/README.md
+   for the exact filenames to drop in. If they 404, the fallback
+   stack below still reads as a deliberate heavy grotesque.
+   --------------------------------------------------------------- */
+@font-face {
+  font-family: "Pragmatica Extended";
+  src:
+    url("/fonts/pragmatica-extended-extrabold.woff2") format("woff2"),
+    url("/fonts/pragmatica-extended-extrabold.woff") format("woff");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --color-epa-red: #e40614;
+  --color-epa-ink: #070707;
+  --font-display:
+    "Pragmatica Extended", "Arial Black", "Segoe UI Black", "Helvetica Neue",
+    system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------
+   Background.
+   Base near-black + ONE quiet thing: a wide red radial glow that
+   bleeds up from behind each video card (see .epa-glow), so the
+   cards read as lit from within rather than pasted on.
+   The top ember gradient is the optional chilla nod, kept under
+   the "decorative" threshold. All CSS — zero bytes over the wire.
+   --------------------------------------------------------------- */
+html {
+  background-color: var(--color-epa-ink);
+}
+
+body {
+  background-color: var(--color-epa-ink);
+  background-image: radial-gradient(
+    125% 55% at 50% 0%,
+    rgba(255, 92, 26, 0.038) 0%,
+    rgba(255, 92, 26, 0) 62%
+  );
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.epa-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+}
+
+/* Wide red bloom behind a card. Sits under the card, never catches
+   pointer events, and scales with whatever it wraps. */
+.epa-glow {
+  position: absolute;
+  inset: -14% -20%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 58% 48% at 50% 62%,
+    rgba(228, 6, 20, 0.05) 0%,
+    rgba(228, 6, 20, 0) 72%
+  );
+  filter: blur(30px);
+}
+
+/* Card border warms toward red on hover/focus-within. */
+.epa-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 18px 44px -12px rgba(0, 0, 0, 0.85),
+    0 2px 10px rgba(0, 0, 0, 0.5);
+  transition:
+    border-color 260ms ease-out,
+    box-shadow 260ms ease-out;
+}
+
+.epa-card:hover,
+.epa-card:focus-within {
+  border-color: rgba(228, 6, 20, 0.45);
+  box-shadow:
+    0 18px 44px -12px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(228, 6, 20, 0.12),
+    0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------------------------------------------------------------
+   Motion. Staggered fade-up on first paint only (CSS animations
+   run once; they do not re-fire on scroll-back).
+   --------------------------------------------------------------- */
+@keyframes epa-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.epa-rise {
+  animation: epa-rise 400ms ease-out both;
+  animation-delay: var(--epa-delay, 0ms);
+}
+
+/* 1px red rule that draws in under video 1's headline. */
+@keyframes epa-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.epa-underline::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 1px;
+  margin: 14px auto 0;
+  background: var(--color-epa-red);
+  box-shadow: 0 0 8px rgba(228, 6, 20, 0.55);
+  transform-origin: center;
+  animation: epa-draw 500ms ease-out both;
+  animation-delay: calc(var(--epa-delay, 0ms) + 240ms);
+}
+
+/* Play button: red halo breathing on a 2.5s cycle. */
+@keyframes epa-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(228, 6, 20, 0.4),
+      0 6px 20px rgba(0, 0, 0, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 14px rgba(228, 6, 20, 0),
+      0 6px 20px rgba(0, 0, 0, 0.55);
+  }
+}
+
+.epa-breathe {
+  animation: epa-breathe 2500ms ease-in-out infinite;
+}
+
+/* Fullscreen pill: short spring on hover. */
+.epa-spring {
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.epa-spring:hover {
+  transform: scale(1.1);
+}
+
+/* ---------------------------------------------------------------
+   Reduced motion: kill every animation, keep the layout.
+   `both` fill-mode means elements land in their final state.
+   --------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Red focus ring, everywhere, always visible. */
+:focus-visible {
+  outline: 2px solid var(--color-epa-red);
+  outline-offset: 3px;
+  border-radius: 4px;
+}

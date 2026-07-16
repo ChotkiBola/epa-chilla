@@ -1,0 +1,10 @@
+{
+  "slugs": [
+    "chilla-offer",
+    "placeholder-2"
+  ],
+  "posters": {
+    "chilla-offer": "posters/chilla-offer.jpg",
+    "placeholder-2": "posters/placeholder-2.jpg"
+  }
+}

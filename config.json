@@ -1,0 +1,14 @@
+{
+  "videos": [
+    {
+      "title": "Quruvchilarga g'amxo'rlik qiladi!",
+      "slug": "chilla-offer",
+      "poster": "posters/chilla-offer.jpg"
+    },
+    {
+      "title": "CORDLESS DRILL",
+      "slug": "placeholder-2",
+      "poster": "posters/placeholder-2.jpg"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /admin
+
+# The landing page itself is reached by QR code, but leaving it indexable
+# costs nothing and lets link previews resolve.
