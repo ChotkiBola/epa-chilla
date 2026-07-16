@@ -41,3 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# NOTE: `vercel link` appends its own `.vercel` and `.env*` lines here. Both are
+# already covered above. Do not let a bare `.env*` sit below `!.env.example` —
+# the last matching pattern wins, so it would silently un-commit the env
+# template. If the CLI re-adds them, delete the duplicates again.
