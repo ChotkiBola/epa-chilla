@@ -10,6 +10,12 @@ const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
 
 const headline = siteConfig.videos[0]?.title ?? "EPA";
 
+/* Video 1's poster doubles as the share image — it is real campaign artwork and
+   already in the repo, so there is nothing extra to keep in sync. metadataBase
+   resolves this to an absolute URL, which Telegram requires. */
+const shareImage = `/${siteConfig.videos[0]?.poster ?? "posters/chilla-offer.jpg"}`;
+const description = "EPA — chilla. Ustalar va quruvchilar uchun.";
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -20,13 +26,27 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: `EPA — ${headline}`,
-  description: "EPA — chilla. Ustalar va quruvchilar uchun.",
+  description,
   openGraph: {
     type: "website",
     locale: "uz_UZ",
     siteName: "EPA",
     title: `EPA — ${headline}`,
-    description: "EPA — chilla. Ustalar va quruvchilar uchun.",
+    description,
+    images: [
+      {
+        url: shareImage,
+        width: 720,
+        height: 1280,
+        alt: headline,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `EPA — ${headline}`,
+    description,
+    images: [shareImage],
   },
 };
 

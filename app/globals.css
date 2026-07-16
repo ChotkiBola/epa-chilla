@@ -135,6 +135,24 @@ body {
   animation-delay: calc(var(--epa-delay, 0ms) + 240ms);
 }
 
+/* In the lg row the headlines are bottom-aligned so each hugs its own card.
+   Left in flow, this rule would add ~15px to h1's box and push its text a line
+   above h2's — so take it out of flow there. `translate` is used rather than
+   `transform` because the draw-in animation owns `transform`. Mobile keeps the
+   rule in flow exactly as it was. */
+@media (min-width: 64rem) {
+  .epa-underline {
+    position: relative;
+  }
+  .epa-underline::after {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin: 10px 0 0;
+    translate: -50% 0;
+  }
+}
+
 /* Play button: red halo breathing on a 2.5s cycle. */
 @keyframes epa-breathe {
   0%,
@@ -185,4 +203,31 @@ body {
   outline: 2px solid var(--color-epa-red);
   outline-offset: 3px;
   border-radius: 4px;
+}
+
+/* Desktop pair: one source of truth for the card width, used by BOTH the grid
+   track and the card itself. Sizing them separately lets the track outgrow the
+   card, and the slack silently widens the gutter.
+
+   420px is the ceiling. The height budget is what usually wins: a 9:16 card
+   420 wide is 747 tall and will not share a laptop screen with the banner and
+   footer, and the row exists precisely so the whole campaign fits unscrolled.
+   336px is the measured chrome above and below the card (padding, banner,
+   headline row, footer) — measured, not guessed. dvh, not vh, so browser
+   chrome cannot cause a scrollbar. Above roughly 1200px tall the 420px cap
+   takes over and the layout stops growing. */
+@media (min-width: 64rem) {
+  .epa-pair {
+    --epa-card-w: min(420px, calc((100dvh - 336px) * 0.5625));
+  }
+}
+
+/* Safety net: whatever a container does, a vertical video must never be
+   cropped and upscaled to fill a 16:9 fullscreen viewport. Pillarbox it. */
+video:fullscreen,
+video:-webkit-full-screen {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  background: #000;
 }

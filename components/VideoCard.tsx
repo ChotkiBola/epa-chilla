@@ -19,6 +19,8 @@ type HlsInstance = {
   attachMedia: (el: HTMLVideoElement) => void;
   destroy: () => void;
   on: (event: string, cb: (evt: string, data: { fatal?: boolean }) => void) => void;
+  /** -1 = uncapped. capLevelToPlayerSize drives this from the element's size. */
+  autoLevelCapping: number;
 };
 type HlsStatic = HlsCtor & {
   isSupported: () => boolean;
@@ -62,6 +64,7 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<HlsInstance | null>(null);
+  const cappingBeforeFullscreen = useRef<number | null>(null);
 
   const [posterVisible, setPosterVisible] = useState(eager);
   const [posterFailed, setPosterFailed] = useState(false);
@@ -112,6 +115,38 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
     return () => window.removeEventListener(PLAY_EVENT, onOtherPlay);
   }, [slug]);
 
+  /* Fullscreen wants the top rung. capLevelToPlayerSize keeps the cap low for
+     the small card, so lift it entirely while fullscreen and put back whatever
+     it was on exit. */
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const hls = hlsRef.current;
+      if (!hls) return;
+
+      const doc = document as Document & { webkitFullscreenElement?: Element | null };
+      const isFullscreen = Boolean(
+        document.fullscreenElement || doc.webkitFullscreenElement,
+      );
+
+      if (isFullscreen) {
+        if (cappingBeforeFullscreen.current === null) {
+          cappingBeforeFullscreen.current = hls.autoLevelCapping;
+        }
+        hls.autoLevelCapping = -1;
+      } else if (cappingBeforeFullscreen.current !== null) {
+        hls.autoLevelCapping = cappingBeforeFullscreen.current;
+        cappingBeforeFullscreen.current = null;
+      }
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", onFullscreenChange);
+    };
+  }, []);
+
   /* Source attach happens only once the user has asked for the video. */
   useEffect(() => {
     if (!armed) return;
@@ -151,7 +186,11 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
       if (cancelled) return;
 
       if (Hls && Hls.isSupported()) {
-        const hls = new Hls();
+        /* The card is ~335px wide; pulling the 480x854 rung for it wastes
+           bandwidth we do not have. capLevelToPlayerSize picks a rung to suit
+           the element, and the fullscreenchange handler below lifts the cap so
+           going fullscreen is not stuck on a low rung. */
+        const hls = new Hls({ capLevelToPlayerSize: true });
         hlsRef.current = hls;
         hls.on(Hls.Events.ERROR, (_evt, data) => {
           if (data?.fatal) useFallback();
@@ -259,7 +298,12 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
             ref={videoRef}
             playsInline
             preload="none"
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-out ${
+            /* `contain`, not `cover`. The card and the source are both 9:16 so
+               cover gains nothing here, but in the 16:9 fullscreen container it
+               zooms the portrait video to fill the width — cropping top and
+               bottom and upscaling ~3x into a blurry mess. Contain pillarboxes
+               instead, which is correct for vertical video. */
+            className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-500 ease-out ${
               videoReady ? "opacity-100" : "opacity-0"
             }`}
             onPlaying={() => {
