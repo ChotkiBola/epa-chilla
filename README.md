@@ -30,6 +30,24 @@ redeploy — roughly a minute. The admin says so in Uzbek after saving; do not
 
 ---
 
+## Deployment
+
+| | |
+| ---------------- | ---------------------------------------------------- |
+| Live             | https://epa-chilla.vercel.app                         |
+| Repo             | https://github.com/ChotkiBola/epa-chilla (private)    |
+| Vercel project   | `anvars-projects-d1b69023/epa-chilla` (Hobby)         |
+
+The repo is connected to Vercel, so **every push to `main` redeploys** — which
+is what makes `/admin` work at all.
+
+**`vercel.json` pins `"framework": "nextjs"` — do not remove it.** The project
+was first created with Framework Preset "Other", whose output directory is
+"`public` if it exists". Vercel ran the Next.js build and then published the raw
+`public/` folder as a static site: assets resolved at the root, but `/` and
+`/admin` returned 404 and none of `next.config.ts`'s `headers()` applied. The
+pin makes the preset irrelevant.
+
 ## Local setup
 
 ```bash
