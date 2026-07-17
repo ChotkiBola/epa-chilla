@@ -105,80 +105,54 @@ Videos are encoded **once** with ffmpeg and committed. There is no in-browser
 encoding, no job queue, no server-side ffmpeg — out of scope, and it would blow
 the function limits anyway.
 
-### 1. Encode the HLS ladder
+### 1. Encode
 
-Renditions are **named by height**, matching the videos already in the repo:
-
-| Playlist     | Resolution | ~Bandwidth |
-| ------------ | ---------- | ---------- |
-| `854p.m3u8`  | 480×854    | ~1.0 Mbps  |
-| `640p.m3u8`  | 360×640    | ~600 kbps  |
-| `480p.m3u8`  | 270×480    | ~365 kbps  |
-
-Three rungs, topping out at 480×854. That is deliberate — a vertical campaign
-clip does not need a fat 1080p rendition, and the top rung is what most phones
-will pull. Match this ladder for new videos so the set stays consistent.
-
-Pick a slug (lowercase, hyphens — it becomes a URL path), then:
+One command does the ladder, the MP4 fallback and the poster:
 
 ```bash
-SLUG=my-new-video
-mkdir -p public/videos/$SLUG
-
-ffmpeg -i input.mp4 \
-  -filter_complex "[0:v]split=3[v1][v2][v3];\
-[v1]scale=-2:854[v1out];[v2]scale=-2:640[v2out];[v3]scale=-2:480[v3out]" \
-  -map "[v1out]" -c:v:0 libx264 -b:v:0 900k -maxrate:v:0 990k -bufsize:v:0 1350k \
-  -map "[v2out]" -c:v:1 libx264 -b:v:1 500k -maxrate:v:1 550k -bufsize:v:1  750k \
-  -map "[v3out]" -c:v:2 libx264 -b:v:2 270k -maxrate:v:2 300k -bufsize:v:2  400k \
-  -map a:0 -map a:0 -map a:0 -c:a aac -b:a 96k -ac 2 \
-  -preset slow -profile:v main -sc_threshold 0 -g 60 -keyint_min 60 \
-  -hls_time 10 -hls_playlist_type vod -hls_flags independent_segments \
-  -hls_segment_filename "public/videos/$SLUG/seg_%v_%03d.ts" \
-  -master_pl_name master.m3u8 \
-  -var_stream_map "v:0,a:0,name:854p v:1,a:1,name:640p v:2,a:2,name:480p" \
-  -f hls "public/videos/$SLUG/%v.m3u8"
+./scripts/encode.sh master.mp4 my-new-video
 ```
 
-That produces `master.m3u8`, the three rung playlists, and `seg_<rung>_NNN.ts`
-with 10-second segments (long segments keep the file count — and the commit —
-small).
+The slug is lowercase and hyphenated — it becomes a URL path segment and the
+folder name under `public/videos/`.
 
-`-g 60` assumes ~30 fps source, putting a keyframe every 2s so segments cut
-cleanly. If your source is 60 fps, use `-g 120 -keyint_min 120`.
+Renditions are **named by height**. From a 4K vertical master the default
+(`MAXH=1280`) gives:
 
-> This command reproduces the ladder of the existing videos, but has not itself
-> been run — the videos in the repo were encoded elsewhere. Check the output of
-> the first video you encode with it before trusting it blindly.
+| Playlist    | Resolution | ~Bitrate  |
+| ----------- | ---------- | --------- |
+| `1280p.m3u8`| 720×1280   | 1800 kbps |
+| `854p.m3u8` | 480×854    | 900 kbps  |
+| `640p.m3u8` | 360×640    | 500 kbps  |
 
-### 2. Encode the progressive fallback
+The script never upscales: a 854px master just produces the 854p and 640p
+rungs. It also skips `-map a:0` entirely when the master has no audio track,
+which otherwise fails the whole encode.
 
-Used when HLS cannot resolve. 720p is plenty:
+**On `MAXH`** — this is the bandwidth dial, and it is the single most
+expensive decision in the project. Measured on an 80s clip, per full session
+(both videos, top rung):
 
-```bash
-ffmpeg -i input.mp4 -vf scale=720:-2 \
-  -c:v libx264 -profile:v main -crf 24 -preset slow \
-  -c:a aac -b:a 96k -ac 2 \
-  -movflags +faststart \
-  public/videos/$SLUG/fallback.mp4
-```
+| `MAXH` | top rung | per view | per session | sessions before the 100 GB pause |
+| ------ | -------- | -------- | ----------- | -------------------------------- |
+| 1920   | 3800 kbps| ~37 MB   | ~74 MB      | **~1,400**                       |
+| 1280   | 1800 kbps| ~18 MB   | ~35 MB      | **~2,900** ← default             |
+| 854    | 900 kbps | ~9 MB    | ~18 MB      | **~5,700**                       |
 
-`-movflags +faststart` is not optional — without it the file will not start
-playing until it has fully downloaded.
+`MAXH=1920` is visibly crisper and costs you half your campaign. The script
+prints these numbers after every encode and warns when the session count drops
+below ~2,000. Raise it only if you know the scan volume is low.
 
-### 3. Add the poster
+The poster is grabbed at **1 second, not frame 0** — clips that fade in from
+white give a blank frame 0, which is exactly how `placeholder-2.jpg` shipped as
+a white rectangle. Replace it by hand if you have a designed one; it is the
+only thing that loads before a tap, so keep it well under 200 KB.
 
-One image, same slug, in `public/posters/`:
+> The script's logic is tested (ladder, no-upscale, no-audio, naming), but the
+> ffmpeg invocation itself has not been run here — ffmpeg is not installed on
+> this machine. Check the first encode's output before trusting it blindly.
 
-```bash
-ffmpeg -i input.mp4 -vf "select=eq(n\,0),scale=1080:-2" -vframes 1 -q:v 3 \
-  public/posters/$SLUG.jpg
-```
-
-The poster is the **only** thing that loads before a tap, so keep it small —
-aim well under 200 KB.
-
-### 4. Commit and push
+### 2. Commit and push
 
 ```bash
 git add public/videos/$SLUG public/posters/$SLUG.jpg
