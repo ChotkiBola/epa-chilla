@@ -2,13 +2,15 @@
   "slugs": [
     "chilla-offer",
     "elektr-sekator",
+    "epa-servis-2",
     "placeholder-2",
     "supra-edit"
   ],
   "posters": {
     "chilla-offer": "posters/chilla-offer.jpg",
-    "elektr-sekator": "posters/elektr-sekator.jpg",
+    "elektr-sekator": "posters/elektr-sekator.png",
+    "epa-servis-2": "posters/epa-servis-2.jpg",
     "placeholder-2": "posters/placeholder-2.jpg",
-    "supra-edit": "posters/supra-edit.jpg"
+    "supra-edit": "posters/supra-edit.png"
   }
 }

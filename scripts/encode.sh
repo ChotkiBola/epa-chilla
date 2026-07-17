@@ -5,8 +5,9 @@
 #          MAXH=1280 ./scripts/encode.sh master.mp4 chilla-offer # bandwidth-saver
 #
 # From a vertical master, builds an HLS ladder capped at MAXH (default 1920 =
-# "1080p vertical"), never upscaling. 25fps, 10s segments, plus an MP4 fallback
-# and a poster.
+# "1080p vertical"), never upscaling. 10s segments, plus an MP4 fallback and a
+# poster. Output is 25fps, or 30fps from a 50fps+ master (60 -> 25 is an uneven
+# 2.4:1 drop and judders; 60 -> 30 is a clean 2:1). Override with FPS=.
 #
 # WHAT MAXH COSTS ---------------------------------------------------------
 # Output lands in public/videos/<slug>/, which Vercel serves. Vercel Hobby
@@ -60,6 +61,24 @@ esac
 TOP=$(( H < MAXH ? H : MAXH ))
 echo "==> source ${H}px, top rung ${TOP}px"
 
+# Output frame rate. 25 is the default, but converting a 60fps master to 25
+# means 60/25 = 2.4 — an uneven drop pattern that judders on every camera move.
+# 60 -> 30 is a clean 2:1. So: fast sources step down to 30, everything else
+# keeps 25. Override with FPS=.
+SRC_FPS_RAW=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate \
+                -of default=nw=1:nk=1 "$IN" | head -1 | tr -d '\r')
+SRC_FPS=$(awk -F/ 'BEGIN{f=25} {if ($2) f=$1/$2; else f=$1} END{printf "%d", (f+0.5)}' <<<"$SRC_FPS_RAW")
+if [ -n "${FPS:-}" ]; then
+  OUT_FPS="$FPS"
+elif [ "$SRC_FPS" -ge 50 ]; then
+  OUT_FPS=30
+else
+  OUT_FPS=25
+fi
+# Keyframe every 2s so 10s segments cut cleanly at any rate.
+GOP=$(( OUT_FPS * 2 ))
+echo "==> source ${SRC_FPS}fps -> encoding at ${OUT_FPS}fps (gop ${GOP})"
+
 # Bitrates are the whole budget conversation. 1920@3000 is the sweet spot for a
 # vertical product/review clip: ~29 MB for an 80s view against a 100 GB/month
 # ceiling. 5000k looks no better to the eye here and costs twice as much.
@@ -100,7 +119,7 @@ HAS_AUDIO=$(ffprobe -v error -select_streams a:0 -show_entries stream=index \
 
 SPLIT=""
 for i in $(seq 0 $((N-1))); do SPLIT="${SPLIT}[v$i]"; done
-FC="[0:v]fps=25,split=${N}${SPLIT};"
+FC="[0:v]fps=${OUT_FPS},split=${N}${SPLIT};"
 for i in $(seq 0 $((N-1))); do
   FC="${FC}[v$i]scale=-2:${LADDER_H[$i]}[v${i}out];"
 done
@@ -123,12 +142,12 @@ else
   for i in $(seq 0 $((N-1))); do VSM="${VSM}v:$i,name:${LADDER_H[$i]}p "; done
 fi
 
-# -g 50 with fps=25 puts a keyframe every 2s, so 10s segments cut cleanly.
+# GOP = 2 seconds at whatever OUT_FPS resolved to, so 10s segments cut cleanly.
 ffmpeg -hide_banner -y -i "$IN" \
   -filter_complex "$FC" \
   "${MAPS[@]}" \
   -preset slow -profile:v high -pix_fmt yuv420p \
-  -g 50 -keyint_min 50 -sc_threshold 0 \
+  -g "$GOP" -keyint_min "$GOP" -sc_threshold 0 \
   -hls_time 10 -hls_playlist_type vod -hls_flags independent_segments \
   -hls_segment_filename "$OUT/seg_%v_%03d.ts" \
   -master_pl_name master.m3u8 \
@@ -138,7 +157,7 @@ ffmpeg -hide_banner -y -i "$IN" \
 echo "==> MP4 fallback"
 AUDIO_ARGS=( -an )
 [ -n "$HAS_AUDIO" ] && AUDIO_ARGS=( -c:a aac -b:a 96k -ac 2 )
-ffmpeg -hide_banner -y -i "$IN" -vf "fps=25,scale=-2:854" \
+ffmpeg -hide_banner -y -i "$IN" -vf "fps=${OUT_FPS},scale=-2:854" \
   -c:v libx264 -preset slow -crf 28 -profile:v main -pix_fmt yuv420p \
   "${AUDIO_ARGS[@]}" -movflags +faststart "$OUT/fallback.mp4"
 
