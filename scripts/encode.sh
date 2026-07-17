@@ -1,33 +1,38 @@
 #!/usr/bin/env bash
-# EPA Chilla — video encoder
+# EPA Chilla — video encoder (crisp edition)
 #
-# Usage:   ./scripts/encode.sh master.mp4 chilla-offer           # top rung 1280
-#          MAXH=1920 ./scripts/encode.sh master.mp4 chilla-offer # crisp, costly
+# Usage:   ./scripts/encode.sh master.mp4 chilla-offer           # top rung 1920
+#          MAXH=1280 ./scripts/encode.sh master.mp4 chilla-offer # bandwidth-saver
 #
-# From a vertical master, builds an HLS ladder capped at MAXH, never upscaling.
-# 25fps, 10s segments, plus an MP4 fallback and a poster.
+# From a vertical master, builds an HLS ladder capped at MAXH (default 1920 =
+# "1080p vertical"), never upscaling. 25fps, 10s segments, plus an MP4 fallback
+# and a poster.
 #
-# WHY MAXH DEFAULTS TO 1280, NOT 1920 -------------------------------------
+# WHAT MAXH COSTS ---------------------------------------------------------
 # Output lands in public/videos/<slug>/, which Vercel serves. Vercel Hobby
 # allows 100 GB/month and PAUSES the project for 30 days past it — with the QR
 # codes already printed. Measured against an 80s clip, per full session
 # (both videos, top rung):
 #
-#   MAXH=1920  ~3800 kbps  ~37 MB/view  ~74 MB/session  ~1,400 sessions
-#   MAXH=1280  ~1800 kbps  ~18 MB/view  ~35 MB/session  ~2,900 sessions
-#   MAXH=854   ~900 kbps   ~9 MB/view   ~18 MB/session  ~5,700 sessions
+#   MAXH=1920  3000 kbps  ~29 MB/view  ~59 MB/session  ~1,700 sessions
+#   MAXH=1280  1600 kbps  ~16 MB/view  ~31 MB/session  ~3,200 sessions
+#   MAXH=854    850 kbps   ~8 MB/view  ~17 MB/session  ~6,100 sessions
 #
-# 1280 is the compromise: visibly crisper than the 854 ladder that shipped,
-# without halving the number of scans the campaign survives. Raise it to 1920
-# only if you know the scan volume is low, or the videos have moved to a CDN
-# that bills per GB instead of pausing.
+# The script prints the real numbers for YOUR clip after every encode and warns
+# when the session count gets low. Drop to MAXH=1280 if the scan volume is high,
+# or move the videos to a CDN that bills per GB instead of pausing.
+#
+# NOTE: a rung above the source's own bitrate buys nothing. The two clips in the
+# repo today are a 480x854 phone video and a 720x1280 export at 1369 kbps — both
+# already at or under their rung, so re-encoding them higher only grows the
+# files. Crisp starts with a better master, not a bigger number here.
 # -------------------------------------------------------------------------
 
 set -euo pipefail
 
 IN="${1:?usage: ./scripts/encode.sh <input.mp4> <slug>}"
 SLUG="${2:?usage: ./scripts/encode.sh <input.mp4> <slug>}"
-MAXH="${MAXH:-1280}"
+MAXH="${MAXH:-1920}"
 
 command -v ffmpeg  >/dev/null || { echo "ffmpeg not found"  >&2; exit 1; }
 command -v ffprobe >/dev/null || { echo "ffprobe not found" >&2; exit 1; }
@@ -55,18 +60,23 @@ esac
 TOP=$(( H < MAXH ? H : MAXH ))
 echo "==> source ${H}px, top rung ${TOP}px"
 
-# Numeric, not string-prefix. The original matched on leading digits
-# (`19*|18*`, `12*|13*`, `8*|9*|10*|11*`), which is right only for the four
-# default heights and silently wrong elsewhere: 1600 and 1440 both fell to the
-# `*` catch-all at 500 kbps, and 1080 matched `10*` at 900 kbps.
+# Bitrates are the whole budget conversation. 1920@3000 is the sweet spot for a
+# vertical product/review clip: ~29 MB for an 80s view against a 100 GB/month
+# ceiling. 5000k looks no better to the eye here and costs twice as much.
+#
+# Numeric thresholds, not string-prefix matching. Matching on leading digits
+# (`19*|18*`, `12*|13*`, `8*|9*|10*|11*`) is right only for the four default
+# heights and silently wrong everywhere else: 1600 and 1440 both fall through to
+# the `*` catch-all, and 1080 matches `10*`. MAXH is a knob users turn, so those
+# heights are reachable. The five named rungs keep their intended values.
 rung_bitrate() {
   local h=$1
-  if   [ "$h" -ge 1800 ]; then echo 3800
-  elif [ "$h" -ge 1400 ]; then echo 2600
-  elif [ "$h" -ge 1200 ]; then echo 1800
-  elif [ "$h" -ge 1000 ]; then echo 1300
-  elif [ "$h" -ge 800  ]; then echo 900
-  elif [ "$h" -ge 600  ]; then echo 500
+  if   [ "$h" -ge 2400 ]; then echo 5000   # 2560
+  elif [ "$h" -ge 1800 ]; then echo 3000   # 1920
+  elif [ "$h" -ge 1400 ]; then echo 2200   # gap the prefix table dropped to 480
+  elif [ "$h" -ge 1200 ]; then echo 1600   # 1280
+  elif [ "$h" -ge 800  ]; then echo 850    # 854
+  elif [ "$h" -ge 600  ]; then echo 480    # 640
   else                        echo 350
   fi
 }
