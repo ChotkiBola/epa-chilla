@@ -243,9 +243,25 @@ The page renders even without the credentials — it just cannot save from
 
 ## Notes for whoever touches this next
 
+- **NEVER delete a file under `/videos/` or `/fonts/` and then restore it at the
+  same URL.** `next.config.ts` serves those paths with
+  `Cache-Control: public, max-age=31536000, immutable`, and Next applies that
+  header to **404 responses too**. Any browser that requests the URL while the
+  file is missing caches the 404 as immutable — **for a year**. Restoring the
+  file does not help: the server returns 200, the browser keeps serving its
+  cached 404, and that visitor's page is broken until the entry expires.
+
+  This is not hypothetical; it happened during the brief Bunny migration when
+  the videos were deleted and put back. `immutable` is only safe because a new
+  video is supposed to be a **new slug** — the URLs are never meant to be
+  reused. If you ever must replace a video in place, give it a new slug so the
+  URL changes, and update `config.json` to match.
+
 - **`.gitattributes` matters.** HLS segments are `*.ts` — MPEG-TS, not
   TypeScript. It marks them binary so Git does not try to diff them.
-  `tsconfig.json` excludes `public/` for the same reason.
+  `tsconfig.json` excludes `public/` for the same reason. `*.sh` is pinned to
+  LF: checked out with CRLF on Windows and run under bash, the shebang gains a
+  trailing CR and the script dies with "bad interpreter".
 - **Do not trust `canPlayType` for HLS.** Chromium answers `"maybe"` for
   `application/vnd.apple.mpegurl` while having no native HLS on desktop.
   `components/VideoCard.tsx` pairs it with a WebKit check; without that, every
