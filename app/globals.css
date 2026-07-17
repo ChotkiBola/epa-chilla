@@ -223,11 +223,17 @@ body {
 }
 
 /* A barely-visible highlight across the top third turns the flat disc into a
-   lit object. */
-.epa-play {
-  position: relative;
-}
+   lit object.
 
+   Do NOT add `position: relative` here. The button already carries Tailwind's
+   `absolute`, which is a positioned ancestor for ::before, so relative is
+   redundant — and actively harmful: Tailwind v4 emits utilities inside
+   `@layer utilities`, and unlayered CSS beats layered CSS whatever the
+   specificity. So this rule silently overrode `absolute`, the button dropped
+   into normal flow at the top of the card, and `-translate-y-1/2` pulled its
+   top half above the card where overflow-hidden clipped it. It only looked
+   centred on Chrome by luck (in-flow y=0 + top:50% happens to land mid-card);
+   on iOS it sat clipped at the top edge. */
 .epa-play::before {
   content: "";
   position: absolute;
