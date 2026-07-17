@@ -2,11 +2,13 @@
   "slugs": [
     "chilla-offer",
     "elektr-sekator",
-    "placeholder-2"
+    "placeholder-2",
+    "supra-edit"
   ],
   "posters": {
     "chilla-offer": "posters/chilla-offer.jpg",
     "elektr-sekator": "posters/elektr-sekator.jpg",
-    "placeholder-2": "posters/placeholder-2.jpg"
+    "placeholder-2": "posters/placeholder-2.jpg",
+    "supra-edit": "posters/supra-edit.jpg"
   }
 }
