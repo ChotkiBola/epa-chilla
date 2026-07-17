@@ -53,14 +53,27 @@ function loadHls(): Promise<HlsStatic | null> {
 }
 
 type Props = {
-  slug: string;
+  /** Stable identity for the "only one plays at a time" event. */
+  id: string;
+  /** HLS playlist URL — absolute (Bunny CDN) or /videos/... (repo). */
+  src: string;
+  /** Progressive MP4 for when HLS cannot play. Null = nothing to fall back to. */
+  fallbackSrc: string | null;
+  /** Poster URL, used as-is. */
   poster: string;
   title: string;
   /** First card paints immediately; later cards wait for IntersectionObserver. */
   eager?: boolean;
 };
 
-export default function VideoCard({ slug, poster, title, eager = false }: Props) {
+export default function VideoCard({
+  id,
+  src,
+  fallbackSrc,
+  poster,
+  title,
+  eager = false,
+}: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<HlsInstance | null>(null);
@@ -73,8 +86,8 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  const masterUrl = `/videos/${slug}/master.m3u8`;
-  const fallbackUrl = `/videos/${slug}/fallback.mp4`;
+  const masterUrl = src;
+  const fallbackUrl = fallbackSrc;
 
   /* The server-rendered poster can finish failing before React hydrates, so
      its onError never fires. Re-check load state the moment we get the node. */
@@ -108,12 +121,12 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
   /* Only one video plays at a time. */
   useEffect(() => {
     const onOtherPlay = (event: Event) => {
-      const detail = (event as CustomEvent<{ slug: string }>).detail;
-      if (detail?.slug !== slug) videoRef.current?.pause();
+      const detail = (event as CustomEvent<{ id: string }>).detail;
+      if (detail?.id !== id) videoRef.current?.pause();
     };
     window.addEventListener(PLAY_EVENT, onOtherPlay);
     return () => window.removeEventListener(PLAY_EVENT, onOtherPlay);
-  }, [slug]);
+  }, [id]);
 
   /* Fullscreen wants the top rung. capLevelToPlayerSize keeps the cap low for
      the small card, so lift it entirely while fullscreen and put back whatever
@@ -156,7 +169,8 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
     let cancelled = false;
     const useFallback = () => {
       if (cancelled) return;
-      if (video.src.endsWith("fallback.mp4")) return; // already degraded
+      if (!fallbackUrl) return; // nothing to degrade to — poster stays up
+      if (video.src === fallbackUrl || video.src.endsWith(fallbackUrl)) return;
       hlsRef.current?.destroy();
       hlsRef.current = null;
       video.src = fallbackUrl;
@@ -223,13 +237,13 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
   }, [armed, masterUrl, fallbackUrl]);
 
   const start = useCallback(() => {
-    window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: { slug } }));
+    window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: { id } }));
     if (!armed) {
       setArmed(true);
       return; // the effect above attaches a source and plays
     }
     void videoRef.current?.play().catch(() => {});
-  }, [armed, slug]);
+  }, [armed, id]);
 
   const toggle = useCallback(() => {
     const video = videoRef.current;
@@ -279,7 +293,7 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
           // eslint-disable-next-line @next/next/no-img-element
           <img
             ref={posterRef}
-            src={`/${poster}`}
+            src={poster}
             alt=""
             width={1080}
             height={1920}
@@ -339,7 +353,7 @@ export default function VideoCard({ slug, poster, title, eager = false }: Props)
             type="button"
             onClick={start}
             aria-label={`Videoni ijro etish: ${title}`}
-            className="epa-breathe absolute top-1/2 left-1/2 z-20 flex h-18 w-18 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-epa-red transition-transform duration-100 active:scale-[0.94]"
+            className="epa-breathe epa-play absolute top-1/2 left-1/2 z-20 flex h-18 w-18 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-epa-red transition-transform duration-100 active:scale-[0.94]"
           >
             <svg
               viewBox="0 0 24 24"

@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import VideoCard from "@/components/VideoCard";
 import Embers from "@/components/Embers";
-import { siteConfig } from "@/lib/config";
+import { resolveVideo, siteConfig } from "@/lib/config";
 
 /* Reveal order, 80ms apart:
    banner → headline 1 → card 1 → divider → headline 2 → card 2 → footer */
@@ -13,7 +13,7 @@ const delay = (step: number) => ({ "--epa-delay": `${step * STEP_MS}ms` }) as Re
 const COL = ["lg:col-start-1", "lg:col-start-2"];
 
 export default function Page() {
-  const { videos } = siteConfig;
+  const videos = siteConfig.videos.map(resolveVideo);
   const footerStep = videos.length * 3;
 
   /* The side-by-side row is designed for exactly two cards. Any other count
@@ -54,19 +54,19 @@ export default function Page() {
             const col = isPair ? COL[i] : "";
 
             return (
-              <Fragment key={video.slug}>
+              <Fragment key={video.id}>
                 {/* The rule separated two stacked videos. In a row it has no
                     job, so it is gone above lg. */}
                 {!isFirst && (
                   <div
                     aria-hidden="true"
-                    className="epa-rise mt-14 mb-14 h-px w-[60px] bg-epa-red shadow-[0_0_8px_rgba(228,6,20,0.55)] lg:hidden"
+                    className="epa-rise epa-rule mt-14 mb-14 h-px w-[60px] bg-epa-red shadow-[0_0_8px_rgba(228,6,20,0.55)] lg:hidden"
                     style={delay(3 * i)}
                   />
                 )}
 
                 <Heading
-                  className={`epa-rise epa-display mt-12 text-center text-[clamp(1.6rem,7vw,2.25rem)] text-white lg:mt-0 ${
+                  className={`epa-rise epa-settle epa-display mt-12 text-center text-[clamp(1.6rem,7vw,2.25rem)] text-white lg:mt-0 ${
                     isFirst ? "epa-underline" : ""
                   } ${col} lg:row-start-1 lg:self-end`}
                   style={delay(3 * i + 1)}
@@ -79,7 +79,9 @@ export default function Page() {
                   style={delay(3 * i + 2)}
                 >
                   <VideoCard
-                    slug={video.slug}
+                    id={video.id}
+                    src={video.src}
+                    fallbackSrc={video.fallbackSrc}
                     poster={video.poster}
                     title={video.title}
                     eager={isFirst}
@@ -100,7 +102,7 @@ export default function Page() {
             alt=""
             width={24}
             height={24}
-            className="h-6 w-6 opacity-45"
+            className="h-6 w-6 opacity-45 transition-opacity duration-300 hover:opacity-90"
           />
           <p className="text-xs text-white/40">
             © 2026 EPA ·{" "}

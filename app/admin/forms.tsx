@@ -3,6 +3,7 @@
 import { useActionState, useCallback, useState } from "react";
 import { login, saveConfig, type LoginState, type SaveState } from "./actions";
 import type { VideoEntry } from "@/lib/config";
+import type { BunnyVideo } from "@/lib/bunny";
 
 const input =
   "w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-white placeholder:text-white/30 focus:border-epa-red focus:outline-none";
@@ -44,7 +45,20 @@ export function LoginForm() {
   );
 }
 
-type Row = VideoEntry & { fileUrl: string };
+/* One dropdown drives everything, its value encodes the source:
+     "bunny:<guid>"  — Bunny Stream video (thumbnail comes from Bunny)
+     "local:<slug>"  — repo video (poster from repo, optional upload) */
+type Row = {
+  title: string;
+  selection: string;
+  /** Repo poster path — only meaningful for local: selections. */
+  posterPath: string;
+  fileUrl: string;
+};
+
+function toSelection(v: VideoEntry): string {
+  return v.bunnyId ? `bunny:${v.bunnyId}` : `local:${v.slug ?? ""}`;
+}
 
 /**
  * The whole point of the thumbnail is catching a wrong pick, so a missing
@@ -85,19 +99,38 @@ export function ConfigForm({
   videos,
   slugs,
   postersBySlug,
+  bunnyVideos,
+  bunnyHost,
   logoutAction,
 }: {
   videos: VideoEntry[];
   slugs: string[];
   postersBySlug: Record<string, string>;
+  bunnyVideos: BunnyVideo[];
+  bunnyHost: string;
   logoutAction: () => Promise<void>;
 }) {
   const [state, action, pending] = useActionState<SaveState, FormData>(saveConfig, {
     status: "idle",
   });
   const [rows, setRows] = useState<Row[]>(
-    videos.map((v) => ({ ...v, fileUrl: "" })),
+    videos.map((v) => ({
+      title: v.title,
+      selection: toSelection(v),
+      posterPath: v.poster ?? "",
+      fileUrl: "",
+    })),
   );
+
+  const bunnyByGuid = new Map(bunnyVideos.map((b) => [b.guid, b]));
+
+  const previewFor = (row: Row): string => {
+    if (row.selection.startsWith("bunny:")) {
+      const b = bunnyByGuid.get(row.selection.slice(6));
+      return b && bunnyHost ? `https://${bunnyHost}/${b.guid}/${b.thumb}` : "";
+    }
+    return row.fileUrl || (row.posterPath ? `/${row.posterPath}` : "");
+  };
 
   const update = (i: number, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -126,7 +159,11 @@ export function ConfigForm({
       <input type="hidden" name="count" value={rows.length} />
 
       {rows.map((row, i) => {
-        const preview = row.fileUrl || (row.poster ? `/${row.poster}` : "");
+        const preview = previewFor(row);
+        const isBunny = row.selection.startsWith("bunny:");
+        const known =
+          (isBunny && bunnyByGuid.has(row.selection.slice(6))) ||
+          (!isBunny && slugs.includes(row.selection.slice(6)));
 
         return (
           <fieldset
@@ -153,30 +190,48 @@ export function ConfigForm({
 
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <label className={label} htmlFor={`slug-${i}`}>
+                <label className={label} htmlFor={`selection-${i}`}>
                   Video
                 </label>
                 <select
-                  id={`slug-${i}`}
-                  name={`slug-${i}`}
-                  value={row.slug}
-                  onChange={(e) =>
+                  id={`selection-${i}`}
+                  name={`selection-${i}`}
+                  value={row.selection}
+                  onChange={(e) => {
+                    const selection = e.target.value;
                     update(i, {
-                      slug: e.target.value,
-                      poster: postersBySlug[e.target.value] ?? "",
+                      selection,
+                      posterPath: selection.startsWith("local:")
+                        ? (postersBySlug[selection.slice(6)] ?? "")
+                        : "",
                       fileUrl: "",
-                    })
-                  }
+                    });
+                  }}
                   className={input}
                 >
-                  {!slugs.includes(row.slug) && (
-                    <option value={row.slug}>{row.slug} (topilmadi)</option>
-                  )}
-                  {slugs.map((slug) => (
-                    <option key={slug} value={slug}>
-                      {slug}
+                  {!known && (
+                    <option value={row.selection}>
+                      {row.selection} (topilmadi)
                     </option>
-                  ))}
+                  )}
+                  {bunnyVideos.length > 0 && (
+                    <optgroup label="Bunny Stream">
+                      {bunnyVideos.map((b) => (
+                        <option key={b.guid} value={`bunny:${b.guid}`}>
+                          {b.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {slugs.length > 0 && (
+                    <optgroup label="Repo (eski)">
+                      {slugs.map((slug) => (
+                        <option key={slug} value={`local:${slug}`}>
+                          {slug}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 
@@ -184,8 +239,13 @@ export function ConfigForm({
               <PosterThumb key={preview} src={preview} />
             </div>
 
-            <input type="hidden" name={`poster-current-${i}`} value={row.poster} />
+            <input type="hidden" name={`poster-current-${i}`} value={row.posterPath} />
 
+            {isBunny ? (
+              <p className="text-xs leading-relaxed text-white/40">
+                Rasm (oblojka) Bunny panelida tanlanadi: video → Thumbnail.
+              </p>
+            ) : (
             <div>
               <label className={label} htmlFor={`poster-file-${i}`}>
                 Yangi rasm (ixtiyoriy · JPG/PNG/WEBP · 3 MB gacha)
@@ -202,6 +262,7 @@ export function ConfigForm({
                 className="w-full text-sm text-white/60 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-white"
               />
             </div>
+            )}
           </fieldset>
         );
       })}

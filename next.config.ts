@@ -6,6 +6,17 @@ import type { NextConfig } from "next";
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
 const nextConfig: NextConfig = {
+  /* Server Actions reject request bodies over 1 MB BEFORE the action runs —
+     the admin's own 3 MB poster check never got a chance to fire, so any
+     real phone photo failed with a generic error. 4 MB covers the 3 MB
+     poster cap plus multipart overhead, and stays under Vercel's 4.5 MB
+     function body limit. */
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
+  },
+
   async headers() {
     return [
       {

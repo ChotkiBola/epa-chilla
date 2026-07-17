@@ -37,11 +37,29 @@ html {
 
 body {
   background-color: var(--color-epa-ink);
-  background-image: radial-gradient(
-    125% 55% at 50% 0%,
-    rgba(255, 92, 26, 0.038) 0%,
-    rgba(255, 92, 26, 0) 62%
-  );
+  /* Three quiet layers, top of list paints on top:
+     1. vignette — edges ~12% darker so the eye drifts to the middle
+     2. heat from below — warm glow rising off the bottom edge (chilla)
+     3. the original faint ember gradient at the very top
+     The squint test: the centre feels brighter and the bottom feels warmer,
+     but you cannot point at the line where either happens. */
+  background-image:
+    radial-gradient(
+      120% 90% at 50% 42%,
+      rgba(0, 0, 0, 0) 55%,
+      rgba(0, 0, 0, 0.42) 100%
+    ),
+    linear-gradient(
+      to top,
+      rgba(255, 64, 20, 0.055) 0%,
+      rgba(255, 64, 20, 0.018) 14%,
+      rgba(255, 64, 20, 0) 30%
+    ),
+    radial-gradient(
+      125% 55% at 50% 0%,
+      rgba(255, 92, 26, 0.038) 0%,
+      rgba(255, 92, 26, 0) 62%
+    );
   background-repeat: no-repeat;
   background-attachment: fixed;
   color: #fff;
@@ -75,18 +93,45 @@ body {
 /* Card border warms toward red on hover/focus-within. */
 .epa-card {
   border: 1px solid rgba(255, 255, 255, 0.1);
+  /* The red layer is light, not shadow — the card sits in front of something
+     hot. Alpha stays under 0.2 so it reads as temperature, not decoration. */
   box-shadow:
+    0 24px 64px -16px rgba(228, 6, 20, 0.17),
     0 18px 44px -12px rgba(0, 0, 0, 0.85),
     0 2px 10px rgba(0, 0, 0, 0.5);
   transition:
     border-color 260ms ease-out,
-    box-shadow 260ms ease-out;
+    box-shadow 320ms ease-out;
 }
 
+/* Real objects catch overhead light on their top edge. */
+.epa-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.02) 40%,
+    rgba(255, 255, 255, 0) 75%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Light responds; the object stays still. No scale, no translate. */
 .epa-card:hover,
 .epa-card:focus-within {
   border-color: rgba(228, 6, 20, 0.45);
   box-shadow:
+    0 24px 64px -16px rgba(228, 6, 20, 0.3),
     0 18px 44px -12px rgba(0, 0, 0, 0.85),
     0 0 0 1px rgba(228, 6, 20, 0.12),
     0 2px 10px rgba(0, 0, 0, 0.5);
@@ -153,23 +198,101 @@ body {
   }
 }
 
-/* Play button: red halo breathing on a 2.5s cycle. */
+/* Play button halo. The peak sits at 38%, not 50% — a longer dwell at the
+   dim end reads as embers, where a metronome pulse reads as UI. */
 @keyframes epa-breathe {
-  0%,
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(228, 6, 20, 0.4),
+      0 6px 20px rgba(0, 0, 0, 0.55);
+  }
+  38% {
+    box-shadow:
+      0 0 0 14px rgba(228, 6, 20, 0),
+      0 6px 20px rgba(0, 0, 0, 0.55);
+  }
   100% {
     box-shadow:
       0 0 0 0 rgba(228, 6, 20, 0.4),
       0 6px 20px rgba(0, 0, 0, 0.55);
   }
-  50% {
-    box-shadow:
-      0 0 0 14px rgba(228, 6, 20, 0),
-      0 6px 20px rgba(0, 0, 0, 0.55);
-  }
 }
 
 .epa-breathe {
-  animation: epa-breathe 2500ms ease-in-out infinite;
+  animation: epa-breathe 2800ms ease-in-out infinite;
+}
+
+/* A barely-visible highlight across the top third turns the flat disc into a
+   lit object. */
+.epa-play {
+  position: relative;
+}
+
+.epa-play::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0) 46%
+  );
+  pointer-events: none;
+}
+
+/* Mobile divider: one ember slowly travelling the rule, fading at the ends.
+   A detail for the second visit — dim enough to miss on the first. */
+@keyframes epa-travel {
+  0% {
+    translate: 0 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.75;
+  }
+  88% {
+    opacity: 0.75;
+  }
+  100% {
+    translate: 57px 0;
+    opacity: 0;
+  }
+}
+
+.epa-rule {
+  position: relative;
+}
+
+.epa-rule::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #ffc37a;
+  box-shadow: 0 0 6px 1px rgba(255, 150, 60, 0.7);
+  animation: epa-travel 8s linear infinite;
+  animation-delay: 1200ms;
+}
+
+/* Headline locks into place: tracking settles as it fades in. */
+@keyframes epa-settle {
+  from {
+    letter-spacing: 0.045em;
+  }
+  to {
+    letter-spacing: -0.02em;
+  }
+}
+
+.epa-settle {
+  animation:
+    epa-rise 400ms ease-out both,
+    epa-settle 600ms ease-out both;
+  animation-delay: var(--epa-delay, 0ms);
 }
 
 /* Fullscreen pill: short spring on hover. */

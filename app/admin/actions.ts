@@ -14,6 +14,7 @@ import {
 import { commitSiteConfig, type PosterUpload } from "@/lib/github";
 import type { SiteConfig, VideoEntry } from "@/lib/config";
 import { videoSlugs } from "@/lib/videos";
+import { listBunnyVideos } from "@/lib/bunny";
 
 export type LoginState = { error?: string };
 export type SaveState = { status: "idle" | "deploying" | "error"; message?: string };
@@ -86,14 +87,32 @@ export async function saveConfig(
   const videos: VideoEntry[] = [];
   const posters: PosterUpload[] = [];
 
+  /* One API call per save, then every submitted Bunny id is checked against
+     it — the dropdown is the only source we trust, never free text. */
+  const bunnyByGuid = new Map(
+    (await listBunnyVideos()).map((b) => [b.guid, b]),
+  );
+
   for (let i = 0; i < count; i++) {
     const title = String(formData.get(`title-${i}`) ?? "").trim();
-    const slug = String(formData.get(`slug-${i}`) ?? "").trim();
+    const selection = String(formData.get(`selection-${i}`) ?? "").trim();
     let poster = String(formData.get(`poster-current-${i}`) ?? "").trim();
 
     if (!title) {
       return { status: "error", message: `${i + 1}-video: sarlavha bo'sh bo'lishi mumkin emas.` };
     }
+
+    if (selection.startsWith("bunny:")) {
+      const guid = selection.slice(6);
+      const bunny = bunnyByGuid.get(guid);
+      if (!bunny) {
+        return { status: "error", message: `${i + 1}-video: video tanlanmagan.` };
+      }
+      videos.push({ title, bunnyId: bunny.guid, thumb: bunny.thumb });
+      continue;
+    }
+
+    const slug = selection.startsWith("local:") ? selection.slice(6) : "";
     // Only ever accept a slug we enumerated ourselves — never free text.
     if (!videoSlugs.includes(slug)) {
       return { status: "error", message: `${i + 1}-video: video tanlanmagan.` };
