@@ -1,10 +1,12 @@
 {
   "slugs": [
     "chilla-offer",
+    "elektr-sekator",
     "placeholder-2"
   ],
   "posters": {
     "chilla-offer": "posters/chilla-offer.jpg",
+    "elektr-sekator": "posters/elektr-sekator.jpg",
     "placeholder-2": "posters/placeholder-2.jpg"
   }
 }

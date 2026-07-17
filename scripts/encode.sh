@@ -42,8 +42,16 @@ OUT="public/videos/$SLUG"
 mkdir -p "$OUT" public/posters
 rm -f "$OUT"/*.m3u8 "$OUT"/*.ts "$OUT"/fallback.mp4
 
-H=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$IN")
-[ -n "$H" ] || { echo "could not read height from $IN" >&2; exit 1; }
+# NOT `-of csv=p=0`. iPhone/MOV video streams carry a [SIDE_DATA] block (the
+# display-rotation matrix), which csv emits as an extra empty field — so the
+# height comes back as "854," and the arithmetic below dies with
+# "syntax error: operand expected". ffprobe on Windows also emits CRLF, hence
+# the tr. `default=nw=1:nk=1` prints the bare value.
+H=$(ffprobe -v error -select_streams v:0 -show_entries stream=height \
+      -of default=nw=1:nk=1 "$IN" | head -1 | tr -d '\r')
+case "$H" in
+  ''|*[!0-9]*) echo "could not read a numeric height from $IN (got '$H')" >&2; exit 1;;
+esac
 TOP=$(( H < MAXH ? H : MAXH ))
 echo "==> source ${H}px, top rung ${TOP}px"
 
@@ -77,7 +85,7 @@ echo "==> ladder: ${LADDER_H[*]} px @ ${LADDER_B[*]} kbps"
 
 # A master with no audio track makes `-map a:0` a hard failure.
 HAS_AUDIO=$(ffprobe -v error -select_streams a:0 -show_entries stream=index \
-              -of csv=p=0 "$IN" 2>/dev/null || true)
+              -of default=nw=1:nk=1 "$IN" 2>/dev/null | head -1 | tr -d '\r' || true)
 [ -n "$HAS_AUDIO" ] || echo "==> no audio track — encoding video only"
 
 SPLIT=""
@@ -134,8 +142,9 @@ ffmpeg -hide_banner -y -ss 00:00:01 -i "$IN" -frames:v 1 \
 # Everything below is advisory. `set -o pipefail` turns a failing `du` (e.g. a
 # glob that matched nothing) into a script-wide failure, which would report a
 # perfectly good encode as broken — so each measurement swallows its own error.
-DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$IN" 2>/dev/null \
-        | cut -d. -f1 || true)
+DUR=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$IN" 2>/dev/null \
+        | head -1 | tr -d '\r' | cut -d. -f1 || true)
+case "$DUR" in ''|*[!0-9]*) DUR=80;; esac
 echo
 echo "--- One viewer downloads (per rung):"
 for i in $(seq 0 $((N-1))); do
